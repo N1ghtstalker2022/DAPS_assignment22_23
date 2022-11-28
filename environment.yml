@@ -1,0 +1,7 @@
+name: daps-final
+
+dependencies:
+  - python=<desired-python-version>
+  - pip
+  - pip:
+    - numpy
