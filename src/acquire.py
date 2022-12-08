@@ -1,8 +1,16 @@
+import json
+import os
+
 import yfinance as yf
 import pandas as pd
 
 
-def acquire():
+def acquire(dataset_name):
+    if dataset_name == 'stocks':
+        return acquire_stock_data()
+
+
+def acquire_stock_data():
     # choose American Airline Group
     aal_stock = yf.Ticker("AAL")
 
@@ -16,14 +24,22 @@ def acquire():
         date = aal_stock_data.at[i, "Date"]
         ts = pd.to_datetime(date)
         new_date = ts.strftime('%Y-%m-%d')
-        print(new_date)
         aal_stock_data.at[i, 'Date'] = 0
         aal_stock_data.at[i, 'Date'] = new_date
-        print(aal_stock_data.at[i, 'Date'])
 
-    # convert to json before storing into database
-    stock_data = aal_stock_data.to_json(orient='records')
+    # convert to list
+    stock_data = aal_stock_data.to_dict('records')
 
-    # store dataset into csv format on computer local disk
-    aal_stock_data.to_csv('aal_stock_data.csv', index=False, header=True)
+    current_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    print(current_folder)
+    data_filepath = os.path.join(current_folder, "data", "stock_data.json")
+    print(data_filepath)
+    # store dataset into json format on computer local disk
+    with open(data_filepath, 'w') as outfile:
+        outfile.write(aal_stock_data.to_json(orient='records'))
+
     return stock_data
+
+
+if __name__ == "__main__":
+    acquire_stock_data()
