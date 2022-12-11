@@ -3,11 +3,14 @@ import os
 
 import yfinance as yf
 import pandas as pd
+import requests
 
 
 def acquire(dataset_name):
     if dataset_name == 'stocks':
         return acquire_stock_data()
+    elif dataset_name == 'weather':
+        return acquire_weather_data()
 
 
 def acquire_stock_data():
@@ -30,16 +33,16 @@ def acquire_stock_data():
     # convert to list
     stock_data = aal_stock_data.to_dict('records')
 
-    current_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(current_folder)
-    data_filepath = os.path.join(current_folder, "data", "stock_data.json")
-    print(data_filepath)
-    # store dataset into json format on computer local disk
-    with open(data_filepath, 'w') as outfile:
-        outfile.write(aal_stock_data.to_json(orient='records'))
-
     return stock_data
 
 
+def acquire_weather_data():
+    weather_url_ny = "https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&startDate=2017-04-01" \
+                     "&endDate=2022-04-01&format=json&includeStationName=false&includeStationLocation=0&stations" \
+                     "=US1NYWC0018 "
+    weather_ny = requests.get(weather_url_ny).json()
+    return weather_ny
+
+
 if __name__ == "__main__":
-    acquire_stock_data()
+    acquire_weather_data()

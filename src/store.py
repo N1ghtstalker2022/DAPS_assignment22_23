@@ -30,12 +30,20 @@ def get_server(credentials_filepath=None):
     return server
 
 
-def store(data, db_name, col_name):
+def store_local(data, file_name):
+    current_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_filepath = os.path.join(current_folder, "data", file_name)
+    # store dataset into json format on computer local disk
+    with open(data_filepath, 'w') as outfile:
+        json.dump(data, outfile)
+
+
+def store_cloud(data, db_name, col_name):
     server = get_server()
     db = server[db_name]
     cur_col = db[col_name]
     cur_col.insert_many(data)
-    print("finish")
+    print("finish storing")
 
 
 def contains_collection(db_name, col_name):
@@ -59,6 +67,14 @@ def contains_collection(db_name, col_name):
     return True
 
 
+def read_from_db(db_name, col_name):
+    server = get_server()
+    db = server[db_name]
+    cur_col = db[col_name]
+    all_data = cur_col.find()
+    return all_data
+
+
 # testing
 if __name__ == "__main__":
-    store(acquire_stock_data())
+    store_cloud(acquire_stock_data())
