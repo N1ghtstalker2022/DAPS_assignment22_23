@@ -1,13 +1,33 @@
 import random
+from calendar import month_abbr, day_abbr
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from scipy import stats
+import seaborn as sns
+
+from src.utils import create_dir
 
 
 def explore(data):
+    create_dir('explore')
     stocks_data = data['stocks']
     weather_data = data['weather']
+    stocks_close_data = pd.DataFrame().assign(Close=stocks_data['Close'])
+
+    # Explore seasonal cycles using a 30-day rolling average
+    season_explore(stocks_data.loc[:, 'Close'])
+
+    # Explore dependency on year and month via carpet plot/heatmap
+    year_month_dep_explore(stocks_close_data)
+
+    # Explore dependency on day of the week and month via carpet plot/heatmap
+    month_week_dep_explore(stocks_close_data)
+
+    # Explore weekdays and weekends trends
+    weekdays_weekends_explore(stocks_close_data)
+
     # explore feature correlation for each dataset separately
     feature_correlation_explore(stocks_data, 'stocks')
     feature_correlation_explore(weather_data, 'weather')
@@ -22,9 +42,121 @@ def explore(data):
     # H0: suppose ud >= 0, not rejected
 
 
+def season_explore(data):
+    seasonal_cycle = data.rolling(window=30, center=True).mean().groupby(data.index.dayofyear).mean()
+    q25 = data.rolling(window=30, center=True).mean().groupby(data.index.dayofyear).quantile(0.25)
+    q75 = data.rolling(window=30, center=True).mean().groupby(data.index.dayofyear).quantile(0.75)
+    mdays = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    ndays_m = mdays.copy()
+    ndays_m[2] = 29
+    ndays_m = np.cumsum(ndays_m)
+    ndays_m = ndays_m[:-1]
+    month_ticks = month_abbr[1:]
+    f, ax = plt.subplots(figsize=(10, 7))
+
+    seasonal_cycle.plot(ax=ax, lw=2, color='b', legend=False)
+    ax.fill_between(seasonal_cycle.index, q25.values.ravel(), q75.values.ravel(), color='b', alpha=0.3)
+    ax.set_xticks(ndays_m + 15)
+    ax.set_xticklabels(month_ticks)
+    ax.grid(ls=':')
+    ax.set_xlabel('Month', fontsize=15)
+    ax.set_ylabel('Close value', fontsize=15)
+    ax.set_xlim(0, 365)
+    # ax.set_ylim(10000, 40000)
+    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
+    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+
+    ax.set_title('30 days stocks value', fontsize=15)
+    plt.savefig('explore/season_cycle.png')
+    plt.close()
+
+
+def year_month_dep_explore(data):
+    month_year = data.copy()
+    month_year.loc[:, 'year'] = month_year.index.year
+    month_year.loc[:, 'month'] = month_year.index.month
+    month_year = month_year.groupby(['year', 'month']).mean().unstack()
+    month_year.columns = month_year.columns.droplevel(0)
+    f, ax = plt.subplots(figsize=(12, 6))
+
+    sns.heatmap(month_year, ax=ax, cmap='Blues')
+
+    cbax = f.axes[1]
+    [l.set_fontsize(13) for l in cbax.yaxis.get_ticklabels()]
+    cbax.set_ylabel('Stock Close Value', fontsize=13)
+
+    [ax.axhline(x, ls=':', lw=0.5, color='0.8') for x in np.arange(1, 6)]
+    [ax.axvline(x, ls=':', lw=0.5, color='0.8') for x in np.arange(1, 12)]
+
+    ax.set_title('Stock Close Value per year and month', fontsize=16)
+
+    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
+    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+
+    ax.set_xlabel('Month', fontsize=15)
+    ax.set_ylabel('Year', fontsize=15)
+    ax.set_yticklabels(np.arange(2017, 2023, 1), rotation=0)
+    plt.savefig('explore/year_month_dep.png')
+    plt.close()
+
+
+def month_week_dep_explore(data):
+    month_day = data.copy()
+    month_day.loc[:, 'day_of_week'] = month_day.index.dayofweek
+    month_day.loc[:, 'month'] = month_day.index.month
+    month_day = month_day.groupby(['day_of_week', 'month']).mean().unstack()
+    month_day.columns = month_day.columns.droplevel(0)
+    f, ax = plt.subplots(figsize=(12, 6))
+
+    sns.heatmap(month_day, ax=ax, cmap='Greens')
+
+    cbax = f.axes[1]
+    [l.set_fontsize(13) for l in cbax.yaxis.get_ticklabels()]
+    cbax.set_ylabel('Stock Close Value', fontsize=13)
+
+    [ax.axhline(x, ls=':', lw=0.5, color='0.8') for x in np.arange(1, 7)]
+    [ax.axvline(x, ls=':', lw=0.5, color='0.8') for x in np.arange(1, 12)]
+
+    ax.set_title('Stock Close Value per day of the week and month', fontsize=16)
+
+    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
+    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+
+    ax.set_xlabel('Month', fontsize=15)
+    ax.set_ylabel('Day of the week', fontsize=15)
+    ax.set_yticklabels(day_abbr[0:7])
+    plt.savefig('explore/month_week_dep.png')
+    plt.close()
+
+
+def weekdays_weekends_explore(data):
+    weekdays = data.loc[data.index.dayofweek.isin([0, 1, 2, 3, 4]), 'Close']
+    weekends = data.loc[data.index.dayofweek.isin([5, 6]), 'Close']
+    summary_month_weekdays = weekdays.groupby(weekdays.index.month).describe()
+    summary_month_weekends = weekends.groupby(weekends.index.month).describe()
+    f, ax = plt.subplots(figsize=(10, 7))
+
+    ax.plot(summary_month_weekends.index, summary_month_weekends.loc[:, 'mean'], color='y', label='Weekends', ls='--',
+            lw=3)
+    ax.fill_between(summary_month_weekends.index, summary_month_weekends.loc[:, '25%'],
+                    summary_month_weekends.loc[:, '75%'], facecolor='y', alpha=0.1)
+    ax.plot(summary_month_weekdays.index, summary_month_weekdays.loc[:, 'mean'], color='b', label='Weekdays', lw=3)
+    ax.fill_between(summary_month_weekdays.index, summary_month_weekdays.loc[:, '25%'],
+                    summary_month_weekdays.loc[:, '75%'], facecolor='b', alpha=0.1)
+    ax.legend(fontsize=15)
+    ax.set_xticks(range(1, 13))
+    ax.grid(ls=':', color='0.8')
+    ax.set_xlabel('Month', fontsize=15)
+    ax.set_ylabel('Stocks Close Value', fontsize=15)
+
+    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
+    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+    plt.savefig('explore/weekday_weekend_comp.png')
+    plt.close()
+
 def feature_correlation_explore(df, name):
     fig = pd.plotting.scatter_matrix(df, range_padding=0.5, alpha=0.2)
-    plt.savefig('demo/scm_' + name + '.png')
+    plt.savefig('explore/scm_' + name + '.png')
     plt.close()
 
 
@@ -52,7 +184,7 @@ def correlation_explore(df, name):
     plt.xlabel(col_names[0])
     plt.ylabel(col_names[5])
     plt.subplots_adjust(wspace=1)
-    plt.savefig('demo/scm_' + name + '.png')
+    plt.savefig('explore/scm_' + name + '.png')
     plt.close()
 
 
