@@ -1,7 +1,18 @@
 name: daps-final
-
+channels:
+  - defaults
+  - conda-forge
 dependencies:
-  - python=<desired-python-version>
+  - python=3.8
   - pip
-  - pip:
-    - numpy
+  - notebook
+  - yfinance
+  - pymongo
+  - dnspython
+  - matplotlib
+  - missingno
+  - scikit-learn
+  - tensorflow
+  - openpyxl
+  - fbprophet
+prefix: /Users/morphling/conda/envs/daps-final

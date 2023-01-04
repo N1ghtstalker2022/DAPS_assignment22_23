@@ -1,46 +1,54 @@
+"""This python file is the entrance of the program.
+
+It follows the procedures displayed below.
+1. Acquire stock data.
+2. Collect auxiliary data that might have an impact on the company’s stocks.
+3. Choose the storing strategy that most efficiently supports the upcoming data analysis.
+4. Check for any missing/noisy/outlier data, and clean it, only if necessary.
+5. Process the data, extracting features that you believe are meaningful to forecast the trend
+of the stock.
+6. Provide exploratory data analysis and generate useful visualisations of the data.
+7. Train a model to predict the closing stock price.
+
+"""
+from src import *
+
+
 def main():
-    """This method should be called when the program is run from the command line.
-    The aim of the method is to run the complete, automated workflow you developed
-    to solve the assignment.
+    """This is the start point of the whole project.
 
-    This function will be called by the automated test suite, so make sure that
-    the function signature is not changed, and that it does not require any
-    user input.
+    This function performs data acquisition followed by data storage, data preprocessing, data exploration and data
+    inference.
 
-    If your workflow requires mongoDB (or any other) credentials, please commit them to
-    this repository.
-    Remember that if the workflow pushed new data to a mongo database without checking
-    if the data is already present, the database will contain copies of the data and
-    skew the results.
-
-    After having implemented the method, please delete this docstring and replace
-    it with a description of what your main method does.
-
-    Hereafter, we provide a **volountarily suboptimal** example of how to structure
-    your code. You are free to use this structure, and encouraged to improve it.
-
-    Example:
-        def main():
-            # acquire the necessary data
-            data = acquire()
-
-            # store the data in MongoDB Atlas or Oracle APEX
-            store(data)
-
-            # format, project and clean the data
-            proprocessed_data = preprocess(data)
-
-            # perform exploratory data analysis
-            statistics = explore(proprocessed_data)
-
-            # show your findings
-            visualise(statistics)
-
-            # create a model and train it, visualise the results
-            model = fit(proprocessed_data)
-            visualise(model)
     """
-    raise NotImplementedError()
+    # get database name, assume only one database is used
+    db_name = constants.DATABASE_NAME
+
+    # get collection names
+    col_name_enum = constants.Collections
+
+    preprocessed_data = {}
+    for col_name, _ in col_name_enum.__members__.items():
+        # data acquisition
+        cur_data = acquire.acquire(col_name)
+        # data storing into local disk
+        store.store_local(cur_data, col_name + '_data.json')
+
+        if not store.contains_collection(db_name, col_name):
+            # data storing into cloud-based database
+            store.store_cloud(cur_data, db_name, col_name)
+
+        # start data preprocessing
+        # raw_data = store.read_from_db(db_name, col_name)
+        data = preprocess.preprocess(col_name)
+
+        preprocessed_data[col_name] = data
+
+    # data exploration
+    explore.explore(preprocessed_data)
+    inference.infer(preprocessed_data)
+
+    print("...")
 
 
 if __name__ == "__main__":
