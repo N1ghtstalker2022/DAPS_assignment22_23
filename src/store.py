@@ -1,17 +1,30 @@
+"""Data storage procedure.
+
+This python file stores acquired data into local disks and cloud-based mongodb separately.
+
+Typical usage example:
+
+    store_local('data', 'file_name')
+    store_cloud('data', 'database_name', 'collection_name')
+"""
 import json
 import os.path
-
 import pymongo
-from .acquire import acquire_stock_data
 from .constants import MONGODB_SERVER_ADDRESS
+from .utils import create_dir
 
-
-# install missing library
-# !pip install pymongo
-# !pip install dnspython
 
 # get mongo credentials from local file
 def get_mongo_credentials(filepath):
+    """Get personal credentials to connect with mongodb.
+
+    Args:
+        filepath: Filepath that stores mongodb credential.
+
+    Returns:
+        String formatted username and password
+
+    """
     if filepath is None:
         current_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         filepath = os.path.join(current_folder, "mongo_credential.json")
@@ -23,6 +36,15 @@ def get_mongo_credentials(filepath):
 
 
 def get_server(credentials_filepath=None):
+    """Try to connect with remote mongodb database server
+
+    Args:
+        credentials_filepath: Filepath that stores mongodb credential.
+
+    Returns:
+        Python object that represents mongodb server.
+
+    """
     username, password = get_mongo_credentials(credentials_filepath)
     # connect to local mongo instance
     address = MONGODB_SERVER_ADDRESS.format(username=username, password=password)
@@ -31,6 +53,14 @@ def get_server(credentials_filepath=None):
 
 
 def store_local(data, file_name):
+    """Store data into local file.
+
+    Args:
+        data: Data in json list format.
+        file_name: Local file name.
+
+    """
+    create_dir('data')
     current_folder = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_filepath = os.path.join(current_folder, "data", file_name)
     # store dataset into json format on computer local disk
@@ -39,6 +69,14 @@ def store_local(data, file_name):
 
 
 def store_cloud(data, db_name, col_name):
+    """Store data into cloud database.
+
+    Args:
+        data: Data in json list format.
+        db_name: Database name.
+        col_name: Collection name.
+
+    """
     server = get_server()
     db = server[db_name]
     cur_col = db[col_name]
@@ -47,6 +85,19 @@ def store_cloud(data, db_name, col_name):
 
 
 def contains_collection(db_name, col_name):
+    """Check if collection already exists.
+
+    To prevent duplicated documents.
+
+    Args:
+        db_name: Database name.
+        col_name: Collection name.
+
+    Returns:
+        True for not existing collection.
+        False for existing collection.
+
+    """
     server = get_server()
 
     # check if database exists
@@ -74,7 +125,3 @@ def read_from_db(db_name, col_name):
     all_data = cur_col.find()
     return all_data
 
-
-# testing
-if __name__ == "__main__":
-    store_cloud(acquire_stock_data())

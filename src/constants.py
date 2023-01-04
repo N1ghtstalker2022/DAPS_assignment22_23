@@ -1,3 +1,8 @@
+"""Summarise constants
+
+This python file includes constants that can be used by the whole project
+
+"""
 from enum import Enum
 
 MONGODB_SERVER_ADDRESS = (
@@ -5,6 +10,5 @@ MONGODB_SERVER_ADDRESS = (
 
 DATABASE_NAME = "daps_data"
 
-Collections = Enum('Collections', 'stocks')
-for name, member in Collections.__members__.items():
-    print(name, '=>', member, ',', member.value)
+Collections = Enum('Collections', ('stocks', 'weather', 'covid'))
+

@@ -1,8 +1,22 @@
+"""Data inference procedure.
+
+This python file trains models to predict the closing stock price on each day for the data acquired, stored,
+preprocessed and explored from previous steps. The data spans from April 2017 to April 2022. One single LSTM-based
+model architecture is used for developing two separate models. One is a model for predicting the closing stock price
+on each day for a 1-month time window (until end of May 2022), using only time series of stock prices. The other is A
+model for predicting the closing stock price on each day for a 1-month time window (until end of May 2022),
+using the time series of stock prices and the auxiliary data you collected. Furthermore, it evaluates the performance
+of the model using mean absolute error and create visualizations to provide useful insight of the prediction result.
+
+Typical usage example:
+
+    infer(preprocessed_data_list)
+
+"""
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
 from matplotlib import pyplot as plt
-
 from src.utils import create_dir
 
 MAX_EPOCHS = 20
@@ -10,6 +24,14 @@ OUT_STEPS = 30
 
 
 def infer(df):
+    """Receive preprocessed data and construct two different experimental datasets.
+
+    Conduct a comparison between prediction using only stocks data to predict and prediction using both stocks and auxiliary data.
+
+    Args:
+        df: Dataframe list containing stocks, weather and covid dataframes.
+
+    """
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
     create_dir('infer')
     stocks_data = df['stocks']
@@ -32,6 +54,20 @@ def infer(df):
 
 
 def infer_by_features(df, df_name):
+    """Infer using LSTM-based model.
+
+    Predict the next 30 days of stocks close value by the known data of former 30 days.
+    Create baseline model to give a decent ablation study.
+    Create LSTM model and feed data to it to train, validate and predict.
+    Evaluate the prediction result through metric like mean absolute error.
+    Create joint plot showing marginal distributions to understand the correlation between actual and predicted values.
+    Create residual distribution plot and find the mean, median and skewness of it.
+
+    Args:
+        df: Pandas dataframe.
+        df_name: Specific description of specific dataframe.
+
+    """
     n = len(df)
     train_df = df[0:int(n * 0.7)]
     val_df = df[int(n * 0.7):int(n * 0.9)]
@@ -46,7 +82,7 @@ def infer_by_features(df, df_name):
                                    label_columns=['Close'])
 
     class MultiStepLastBaseline(tf.keras.Model):
-        def call(self, inputs):
+        def call(self, inputs, training=None, mask=None):
             return tf.tile(inputs[:, -1:, :], [1, OUT_STEPS, 1])
 
     last_baseline = MultiStepLastBaseline()
@@ -65,7 +101,6 @@ def infer_by_features(df, df_name):
     plt.close()
 
     # lstm model
-
     multi_lstm_model = tf.keras.Sequential([
         # Shape [batch, time, features] => [batch, lstm_units].
         # Adding more `lstm_units` just overfits more quickly.
@@ -93,11 +128,7 @@ def infer_by_features(df, df_name):
     plt.close()
 
     # predict
-    # multi_window.pred_df = pred_df
-    # multi_window.label_columns = None
-    # pred_data = multi_window.pred
     pred_input = tf.reshape(pred_df[0:30], [1, 30, num_features])
-    true_val = pred_df[30:].loc[:, 'Close']
     pred_val = multi_lstm_model.predict(pred_input)
     pred_val = tf.squeeze(pred_val).numpy()
 
@@ -112,6 +143,16 @@ def infer_by_features(df, df_name):
 
 
 def create_residual_plot(predicted_val, true_val, name):
+    """Create and save residual distribution for prediction and true value.
+
+    Args:
+        predicted_val: Predicted value by the machine learning model
+        true_val: True value collected.
+        name: Specific description of different model name
+
+    Returns:
+
+    """
     plt.figure()
     x = predicted_val
     y = true_val - predicted_val
@@ -121,6 +162,17 @@ def create_residual_plot(predicted_val, true_val, name):
 
 
 def compile_and_fit(model, window, patience=2):
+    """Compile the defined machine learning model and feed the training and validation data into the model.
+
+    Args:
+        model: Machine learning model applied.
+        window: Window contains a certain length of data
+        patience: Number of epochs with no improvement after which training will be stopped, used for early stopping.
+
+    Returns:
+        A History object. Its history attribute is a record of training loss values and metrics values
+        at successive epochs, as well as validation loss values and validation metrics values (if applicable).
+    """
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       patience=patience,
                                                       mode='min')
@@ -130,12 +182,23 @@ def compile_and_fit(model, window, patience=2):
                   metrics=[tf.keras.metrics.MeanAbsoluteError()])
 
     training_set = window.train
-    history = model.fit(window.train, epochs=MAX_EPOCHS,
-                        validation_data=window.val, callbacks=[early_stopping])
+    validation_set = window.val
+    history = model.fit(training_set, epochs=MAX_EPOCHS,
+                        validation_data=validation_set, callbacks=[early_stopping])
     return history
 
 
 def create_joint_plot(forecast, pred_val, true_val, title=None):
+    """Create and save joint plot showing marginal distributions to understand the correlation between actual and
+    predicted values
+
+    Args:
+        forecast: Pandas dataframe containing predicted values.
+        pred_val: Feature representing prediction values.
+        true_val: Feature representing true values.
+        title: Words used to help define title of plotted figures.
+
+    """
     g = sns.jointplot(x=pred_val, y=true_val, data=forecast, kind="reg", color="b")
     g.fig.set_figwidth(8)
     g.fig.set_figheight(8)
@@ -151,8 +214,8 @@ def create_joint_plot(forecast, pred_val, true_val, title=None):
     # ax.set_xlim(0, 0.5)
     # ax.set_ylim(0, 0.5)
     ax.grid(ls=':')
-    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
-    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.xaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.yaxis.get_ticklabels()]
 
     ax.grid(ls=':')
     fig = g.fig
@@ -160,14 +223,34 @@ def create_joint_plot(forecast, pred_val, true_val, title=None):
 
 
 class WindowGenerator(object):
+    """The window contains a certain number of data.
+
+    Attributes:
+        train_df: Training sets in Pandas dataframe format.
+        val_df: Validation sets in Pandas dataframe format.
+        test_df: Testing sets in Pandas dataframe format.
+        _example: Example data used to give a visualization of model performance.
+        label_columns: The feature that is determined to be predicted.
+        column_indices: Dictionary mapping the number representing locations of features to features
+        input_width: Designated input length of data.
+        label_width: Designated input length of label.
+        shift: Span of prediction.
+        total_window_size: The total length of a window.
+        input_slice: Create a slice object. This is used for input slicing.
+        input_indices: Indices of input data for a given window.
+        label_start: Start position for labels for a given window.
+        labels_slice: Create a slice object. This is used for labels slicing.
+        label_indices: Indices of labels data for a given window.
+
+    """
     def __init__(self, input_width, label_width, shift,
-                 train_df, val_df, test_df, pred_df=None,
+                 train_df, val_df, test_df,
                  label_columns=None):
         # Store the raw data.
+        self._example = None
         self.train_df = train_df
         self.val_df = val_df
         self.test_df = test_df
-        self.pred_df = pred_df
 
         # Work out the label column indices.
         self.label_columns = label_columns
@@ -199,6 +282,7 @@ class WindowGenerator(object):
             f'Label column name(s): {self.label_columns}'])
 
     def split_window(self, features):
+        """Split window into inputs and labels windows."""
         inputs = features[:, self.input_slice, :]
         labels = features[:, self.labels_slice, :]
         if self.label_columns is not None:
@@ -214,6 +298,7 @@ class WindowGenerator(object):
         return inputs, labels
 
     def plot(self, model=None, plot_col='Close', max_subplots=3):
+        """Give a visualization for prediction results."""
         inputs, labels = self.example
         plt.figure(figsize=(12, 8))
         plot_col_index = self.column_indices[plot_col]
@@ -246,6 +331,7 @@ class WindowGenerator(object):
         plt.xlabel('Time [d]')
 
     def make_dataset(self, data):
+        """Construct dataset in order to input into tensorflow model."""
         data = np.array(data, dtype=np.float32)
         ds = tf.keras.utils.timeseries_dataset_from_array(
             data=data,
@@ -282,10 +368,3 @@ class WindowGenerator(object):
             self._example = result
         return result
 
-    @property
-    def pred(self):
-        return self.make_dataset(self.pred_df)
-
-# if __name__ == "__main__":
-#     df = preprocess_stocks_data()
-#     infer(df)

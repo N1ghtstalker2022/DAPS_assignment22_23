@@ -1,16 +1,35 @@
+"""Exploratory data analysis.
+
+This python file aims at providing exploratory data analysis to well preprocessed data. First, explore seasonality of
+stocks data, Then, explore dependencies among year, month, week and day to find if there is some noise along with
+fixed or predictable events. After this, explore the correlation between features of stocks data and the correlation
+between stocks data and auxiliary data including weather and covid data. Finally, use hypothesis testing to better
+understand the composition of your dataset and its representativeness.
+
+Typical usage example:
+
+    explore('data_dictionary')
+"""
 import random
 from calendar import month_abbr, day_abbr
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
 import seaborn as sns
-
 from src.utils import create_dir
 
 
 def explore(data):
+    """Explore data.
+
+    Provide exploratory data analysis to preprocessed data. Explore main patterns and dependencies of the data.
+    Provide hypothesis testing to gain some intuition about the data pattern.
+
+    Args:
+        data: Well preprocessed data in Pandas dataframe format.
+
+    """
     create_dir('explore')
     stocks_data = data['stocks']
     weather_data = data['weather']
@@ -43,6 +62,14 @@ def explore(data):
 
 
 def season_explore(data):
+    """Explore seasonality of the data and plot the results.
+
+    Calculate average stocks close value for each month, given several years.
+
+    Args:
+        data: Pandas dataframe.
+
+    """
     seasonal_cycle = data.rolling(window=30, center=True).mean().groupby(data.index.dayofyear).mean()
     q25 = data.rolling(window=30, center=True).mean().groupby(data.index.dayofyear).quantile(0.25)
     q75 = data.rolling(window=30, center=True).mean().groupby(data.index.dayofyear).quantile(0.75)
@@ -63,8 +90,8 @@ def season_explore(data):
     ax.set_ylabel('Close value', fontsize=15)
     ax.set_xlim(0, 365)
     # ax.set_ylim(10000, 40000)
-    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
-    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.xaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.yaxis.get_ticklabels()]
 
     ax.set_title('30 days stocks value', fontsize=15)
     plt.savefig('explore/season_cycle.png')
@@ -72,6 +99,12 @@ def season_explore(data):
 
 
 def year_month_dep_explore(data):
+    """Explore data dependencies between year and month for the stock data.
+
+    Args:
+        data: Pandas dataframe.
+
+    """
     month_year = data.copy()
     month_year.loc[:, 'year'] = month_year.index.year
     month_year.loc[:, 'month'] = month_year.index.month
@@ -82,7 +115,7 @@ def year_month_dep_explore(data):
     sns.heatmap(month_year, ax=ax, cmap='Blues')
 
     cbax = f.axes[1]
-    [l.set_fontsize(13) for l in cbax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in cbax.yaxis.get_ticklabels()]
     cbax.set_ylabel('Stock Close Value', fontsize=13)
 
     [ax.axhline(x, ls=':', lw=0.5, color='0.8') for x in np.arange(1, 6)]
@@ -90,8 +123,8 @@ def year_month_dep_explore(data):
 
     ax.set_title('Stock Close Value per year and month', fontsize=16)
 
-    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
-    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.xaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.yaxis.get_ticklabels()]
 
     ax.set_xlabel('Month', fontsize=15)
     ax.set_ylabel('Year', fontsize=15)
@@ -101,6 +134,12 @@ def year_month_dep_explore(data):
 
 
 def month_week_dep_explore(data):
+    """Explore data dependencies between month and week for the stock data.
+
+    Args:
+        data: Pandas dataframe.
+
+    """
     month_day = data.copy()
     month_day.loc[:, 'day_of_week'] = month_day.index.dayofweek
     month_day.loc[:, 'month'] = month_day.index.month
@@ -111,7 +150,7 @@ def month_week_dep_explore(data):
     sns.heatmap(month_day, ax=ax, cmap='Greens')
 
     cbax = f.axes[1]
-    [l.set_fontsize(13) for l in cbax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in cbax.yaxis.get_ticklabels()]
     cbax.set_ylabel('Stock Close Value', fontsize=13)
 
     [ax.axhline(x, ls=':', lw=0.5, color='0.8') for x in np.arange(1, 7)]
@@ -119,8 +158,8 @@ def month_week_dep_explore(data):
 
     ax.set_title('Stock Close Value per day of the week and month', fontsize=16)
 
-    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
-    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.xaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.yaxis.get_ticklabels()]
 
     ax.set_xlabel('Month', fontsize=15)
     ax.set_ylabel('Day of the week', fontsize=15)
@@ -130,6 +169,12 @@ def month_week_dep_explore(data):
 
 
 def weekdays_weekends_explore(data):
+    """Explore data dependencies between weekdays and weekends for the stock data.
+
+    Args:
+        data: Pandas dataframe.
+
+    """
     weekdays = data.loc[data.index.dayofweek.isin([0, 1, 2, 3, 4]), 'Close']
     weekends = data.loc[data.index.dayofweek.isin([5, 6]), 'Close']
     summary_month_weekdays = weekdays.groupby(weekdays.index.month).describe()
@@ -149,20 +194,35 @@ def weekdays_weekends_explore(data):
     ax.set_xlabel('Month', fontsize=15)
     ax.set_ylabel('Stocks Close Value', fontsize=15)
 
-    [l.set_fontsize(13) for l in ax.xaxis.get_ticklabels()]
-    [l.set_fontsize(13) for l in ax.yaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.xaxis.get_ticklabels()]
+    [label.set_fontsize(13) for label in ax.yaxis.get_ticklabels()]
     plt.savefig('explore/weekday_weekend_comp.png')
     plt.close()
 
+
 def feature_correlation_explore(df, name):
-    fig = pd.plotting.scatter_matrix(df, range_padding=0.5, alpha=0.2)
+    """Plot feature correlation matrix using pandas built-in functions for single dataset.
+
+    Args:
+        df: Pandas dataframe.
+        name: Description of the specific dataset.
+
+    """
+    pd.plotting.scatter_matrix(df, range_padding=0.5, alpha=0.2)
     plt.savefig('explore/scm_' + name + '.png')
     plt.close()
 
 
 def correlation_explore(df, name):
+    """Explore feature correlation between stock data and auxiliary data.
+
+    Args:
+        df: Pandas dataframe.
+        name: Description of the specific dataset.
+
+    """
     col_names = list(df)
-    figure = plt.figure(figsize=[12.8, 4.8])
+    plt.figure(figsize=[12.8, 4.8])
     plt.subplot(151)
     plt.scatter(df.iloc[:, 0], df.iloc[:, 1])
     plt.xlabel(col_names[0])
@@ -189,6 +249,12 @@ def correlation_explore(df, name):
 
 
 def check_normality(data):
+    """Judge if the given data follows normal distribution.
+
+    Args:
+        data: Data in list form
+
+    """
     test_stat_normality, p_value_normality = stats.shapiro(data)
     print("p value:%.4f" % p_value_normality)
     if p_value_normality < 0.05:
@@ -198,21 +264,29 @@ def check_normality(data):
 
 
 def hypo_testing(df):
-    values_noPRCP = []
-    values_withPRCP = []
+    """Provide hypothesis testing.
+
+    Judge whether stock close value is related to weather condition like precipitation.
+
+    Args:
+        df: Pandas dataframe.
+
+    """
+    values_no_prcp = []
+    values_with_prcp = []
     for i in range(len(df.index)):
         cur_index = df.index[i]
         if df.loc[cur_index, 'PRCP'] == 0:
-            values_noPRCP.append(df.loc[cur_index, 'Close'])
+            values_no_prcp.append(df.loc[cur_index, 'Close'])
         else:
-            values_withPRCP.append(df.loc[cur_index, 'Close'])
-    values_noPRCP_sample = random.sample(values_noPRCP, 20)
-    values_withPRCP_sample = random.sample(values_withPRCP, 20)
+            values_with_prcp.append(df.loc[cur_index, 'Close'])
+    values_no_prcp_sample = random.sample(values_no_prcp, 20)
+    values_with_prcp_sample = random.sample(values_with_prcp, 20)
 
-    check_normality(values_noPRCP_sample)
-    check_normality(values_withPRCP_sample)
+    check_normality(values_no_prcp_sample)
+    check_normality(values_with_prcp_sample)
 
-    test_stat, p_value_paired = stats.ttest_rel(values_noPRCP_sample, values_withPRCP_sample)
+    test_stat, p_value_paired = stats.ttest_rel(values_no_prcp_sample, values_with_prcp_sample)
     print("p value:%.6f" % p_value_paired, "one tailed p value:%.6f" % (p_value_paired / 2))
     if p_value_paired < 0.05:
         print("Reject null hypothesis")
