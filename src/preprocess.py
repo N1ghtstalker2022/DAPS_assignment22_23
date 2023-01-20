@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 import missingno as msno
 import seaborn as sns
 from scipy import stats
+from scipy.ndimage import gaussian_filter
+
 from src.utils import create_dir
 import datetime
 
@@ -74,7 +76,25 @@ def preprocess_covid_data():
         cur_date = cur_date + datetime.timedelta(days=1)
     covid_df = covid_df.sort_index()
     covid_df = covid_df.set_index(covid_df.index.astype(dtype='datetime64'))
+
     # 2. provide visualization of the data
+    for column in covid_df:
+        show_covid(covid_df, column, '_ori')
+
+    # smooth the data
+
+    # k = 2
+    # kern = np.ones(2 * k + 1) / (2 * k + 1)
+    # covid_df['new_case'] = np.convolve(covid_df['new_case'], kern, mode='same')
+    # covid_df['new_death'] = np.convolve(covid_df['new_death'], kern, mode='same')
+
+    covid_df['new_case'] = gaussian_filter(covid_df['new_case'], sigma=1, truncate=3)
+    covid_df['new_death'] = gaussian_filter(covid_df['new_death'], sigma=1, truncate=3)
+
+    for column in covid_df:
+        show_covid(covid_df, column, '_smoothed')
+
+
     # visualization through box plot, clearly no outlier is detected
     for column in covid_df:
         show_boxplot(covid_df, column, 'covid')
@@ -85,6 +105,27 @@ def preprocess_covid_data():
     # 3. transformation
     covid_df = normalize(covid_df)
     return covid_df
+
+
+def show_covid(covid_df, column, description):
+    """Plot line chart for covid data and save in local disk.
+
+    Args:
+        covid_df: Pandas dataframe for covid data.
+        column: Specific feature chosen from dataframe.
+        description: Extra words to describe the data.
+
+    """
+    plt.figure()
+    plt.plot(covid_df[column], label=column,
+             linestyle='-', c='y')
+    plt.xlabel('DateTime')
+    plt.ylabel('Value')
+    plt.grid()
+    plt.legend()
+    plt.xlim([datetime.date(2017, 4, 1), datetime.date(2022, 4, 1)])
+    plt.savefig('visualization/covid_' + column.lower() + description + '.png')
+    plt.close()
 
 
 def show_weather(weather_df, column, description):
@@ -135,7 +176,7 @@ def show_close_season(stocks_df):
         stocks_df: Pandas dataframe.
 
     """
-    figure = plt.figure()
+    plt.figure()
     plt.subplot(511)
     plt.plot(stocks_df['Close'].loc['2017-04-01 00:00:00':'2018-04-01 00:00:00'],
              linestyle='-', c='b')

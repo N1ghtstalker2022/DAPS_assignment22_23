@@ -97,4 +97,3 @@ def acquire_covid_data():
     # convert to list
     covid_json = covid_df.to_dict('records')
     return covid_json
-

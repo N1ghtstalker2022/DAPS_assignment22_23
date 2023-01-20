@@ -33,6 +33,7 @@ def explore(data):
     create_dir('explore')
     stocks_data = data['stocks']
     weather_data = data['weather']
+    covid_data = data['covid']
     stocks_close_data = pd.DataFrame().assign(Close=stocks_data['Close'])
 
     # Explore seasonal cycles using a 30-day rolling average
@@ -54,6 +55,9 @@ def explore(data):
     # Explore the correlation between stock price data and other external data
     concatenated_data = pd.concat([stocks_data['Close'], weather_data], axis=1)
     correlation_explore(concatenated_data, 'sw')
+
+    concatenated_data_with_covid = pd.concat([stocks_data['Close'], covid_data], axis=1)
+    correlation_explore(concatenated_data_with_covid, 'sc')
 
     # hypothesis testing 1.defining hypothesis: sample two groups of data, one is 20 sampled close value when there
     # is no PRCP, the other is 20 sampled close value when there is
@@ -222,27 +226,14 @@ def correlation_explore(df, name):
 
     """
     col_names = list(df)
+    col_num = len(col_names)
     plt.figure(figsize=[12.8, 4.8])
-    plt.subplot(151)
-    plt.scatter(df.iloc[:, 0], df.iloc[:, 1])
-    plt.xlabel(col_names[0])
-    plt.ylabel(col_names[1])
-    plt.subplot(152)
-    plt.scatter(df.iloc[:, 0], df.iloc[:, 2])
-    plt.xlabel(col_names[0])
-    plt.ylabel(col_names[2])
-    plt.subplot(153)
-    plt.scatter(df.iloc[:, 0], df.iloc[:, 3])
-    plt.xlabel(col_names[0])
-    plt.ylabel(col_names[3])
-    plt.subplot(154)
-    plt.scatter(df.iloc[:, 0], df.iloc[:, 4])
-    plt.xlabel(col_names[0])
-    plt.ylabel(col_names[4])
-    plt.subplot(155)
-    plt.scatter(df.iloc[:, 0], df.iloc[:, 5])
-    plt.xlabel(col_names[0])
-    plt.ylabel(col_names[5])
+    for i in range(col_num - 1):
+        plt.subplot(1, col_num, i + 1)
+        plt.scatter(df.iloc[:, 0], df.iloc[:, i + 1])
+        plt.xlabel(col_names[0])
+        plt.ylabel(col_names[i + 1])
+
     plt.subplots_adjust(wspace=1)
     plt.savefig('explore/scm_' + name + '.png')
     plt.close()

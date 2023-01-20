@@ -13,7 +13,10 @@ Typical usage example:
     infer(preprocessed_data_list)
 
 """
+import datetime
+
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import tensorflow as tf
 from matplotlib import pyplot as plt
@@ -26,7 +29,8 @@ OUT_STEPS = 30
 def infer(df):
     """Receive preprocessed data and construct two different experimental datasets.
 
-    Conduct a comparison between prediction using only stocks data to predict and prediction using both stocks and auxiliary data.
+    Conduct a comparison between prediction using only stocks data to predict and prediction using both stocks and
+    auxiliary data.
 
     Args:
         df: Dataframe list containing stocks, weather and covid dataframes.
@@ -59,9 +63,6 @@ def infer_by_features(df, df_name):
     Predict the next 30 days of stocks close value by the known data of former 30 days.
     Create baseline model to give a decent ablation study.
     Create LSTM model and feed data to it to train, validate and predict.
-    Evaluate the prediction result through metric like mean absolute error.
-    Create joint plot showing marginal distributions to understand the correlation between actual and predicted values.
-    Create residual distribution plot and find the mean, median and skewness of it.
 
     Args:
         df: Pandas dataframe.
@@ -89,8 +90,10 @@ def infer_by_features(df, df_name):
     last_baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
                           metrics=[tf.keras.metrics.MeanAbsoluteError()])
 
-    multi_val_performance = {}
-    multi_performance = {}
+
+
+    multi_val_performance = dict()
+    multi_performance = dict()
 
     multi_val_performance['Last'] = last_baseline.evaluate(multi_window.val)
     multi_performance['Last'] = last_baseline.evaluate(multi_window.test, verbose=0)
@@ -127,7 +130,29 @@ def infer_by_features(df, df_name):
     plt.savefig('infer/lstm_pred_' + df_name + '.png')
     plt.close()
 
-    # predict
+    #  plot learning curve
+    acc = history.history['mean_absolute_error']
+    val_acc = history.history['val_mean_absolute_error']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    fig = plt.figure()
+    plt.subplot(2, 1, 1)
+    plt.plot(acc, label='Training MAE')
+    plt.plot(val_acc, label='Validation MAE')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation MAE for ' + df_name + ' model')
+
+    plt.subplot(2, 1, 2)
+    plt.plot(loss, label='Training Loss')
+    plt.plot(val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss for ' + df_name + ' model')
+    fig.tight_layout()
+    plt.savefig('infer/learning_curve_' + df_name + '_.png')
+    plt.close()
+
+    # test
     pred_input = tf.reshape(pred_df[0:30], [1, 30, num_features])
     pred_val = multi_lstm_model.predict(pred_input)
     pred_val = tf.squeeze(pred_val).numpy()
@@ -139,8 +164,64 @@ def infer_by_features(df, df_name):
 
     create_joint_plot(compare_df, 'Pred_Close', 'Close', df_name)
     create_residual_plot(pred_val, true_val, df_name)
-    print("finish prediction")
+    print("finish testing")
+    # predict 05/01 to 05/31
 
+    pred_input = tf.reshape(pred_df[30:], [1, 30, num_features])
+    pred_val = multi_lstm_model.predict(pred_input)
+    pred_val = tf.squeeze(pred_val).numpy()
+    new_df = df.copy()
+    extra_df = df.iloc[:1].copy()
+    # cases should be zero before there is a statistics about covid
+    for column in extra_df.columns:
+        extra_df.loc[:, column] = 0
+    cur_date_string = '2022-05-01'
+    cur_date = datetime.datetime.strptime('2022-05-01', '%Y-%m-%d').date()
+    pred_end_date = '2022-05-30'
+    extra_df = extra_df.rename(index={df.iloc[:1].index[0]: cur_date}, inplace=False)
+    pred_end_date = datetime.datetime.strptime(pred_end_date, '%Y-%m-%d').date()
+    day_count = 0
+    while cur_date <= pred_end_date:
+        pred_single_val = pred_val[day_count]
+        day_count = day_count + 1
+        new_df = pd.concat([extra_df, new_df.loc[:]])
+        new_df.loc[cur_date, 'Close'] = pred_single_val
+
+        extra_df = extra_df.rename(
+            index={cur_date: (cur_date + datetime.timedelta(days=1))},
+            inplace=False)
+        cur_date = cur_date + datetime.timedelta(days=1)
+    new_df = new_df.set_index(new_df.index.astype(dtype='datetime64'))
+    new_df = new_df.sort_index()
+
+    show_stocks_with_pred(new_df, 'Close', df_name)
+    print("finish pred")
+
+def show_stocks_with_pred(df, column, name):
+    """Plot line chart for stocks data and save in local disk.
+
+    Args:
+        stocks_df: Pandas dataframe for stocks data.
+        column: Specific feature chosen from dataframe.
+
+    """
+    plt.figure()
+    label = column + ' value'
+    start_date = datetime.datetime.strptime('2017-04-01', '%Y-%m-%d')
+    end_date = datetime.datetime.strptime('2022-04-30', '%Y-%m-%d')
+    plt.plot(df[column].loc[start_date:end_date], label=label,
+             linestyle='-', c='g')
+    pred_start_date = datetime.datetime.strptime('2022-04-30', '%Y-%m-%d')
+    pred_end_date = datetime.datetime.strptime('2022-05-30', '%Y-%m-%d')
+    pre_label = 'predicted_' + column + ' value'
+    plt.plot(df[column].loc[pred_start_date:pred_end_date], label=pre_label,
+             linestyle='-', c='b')
+    plt.xlabel('DateTime')
+    plt.ylabel('Value')
+    plt.grid()
+    plt.legend()
+    plt.savefig('infer/stock_' + column.lower() + '_with_pred_' + name + '.png')
+    plt.close()
 
 def create_residual_plot(predicted_val, true_val, name):
     """Create and save residual distribution for prediction and true value.
@@ -185,6 +266,7 @@ def compile_and_fit(model, window, patience=2):
     validation_set = window.val
     history = model.fit(training_set, epochs=MAX_EPOCHS,
                         validation_data=validation_set, callbacks=[early_stopping])
+
     return history
 
 
@@ -200,8 +282,8 @@ def create_joint_plot(forecast, pred_val, true_val, title=None):
 
     """
     g = sns.jointplot(x=pred_val, y=true_val, data=forecast, kind="reg", color="b")
-    g.fig.set_figwidth(8)
-    g.fig.set_figheight(8)
+    g.fig.set_figwidth(10)
+    g.fig.set_figheight(10)
 
     ax = g.fig.axes[1]
     if title is not None:
@@ -243,6 +325,7 @@ class WindowGenerator(object):
         label_indices: Indices of labels data for a given window.
 
     """
+
     def __init__(self, input_width, label_width, shift,
                  train_df, val_df, test_df,
                  label_columns=None):
@@ -320,7 +403,7 @@ class WindowGenerator(object):
             plt.scatter(self.label_indices, labels[n, :, label_col_index],
                         edgecolors='k', label='Labels', c='#2ca02c', s=64)
             if model is not None:
-                predictions = model(inputs)
+                predictions = model.predict(inputs)
                 plt.scatter(self.label_indices, predictions[n, :, label_col_index],
                             marker='X', edgecolors='k', label='Predictions',
                             c='#ff7f0e', s=64)
@@ -367,4 +450,3 @@ class WindowGenerator(object):
             # And cache it for next time
             self._example = result
         return result
-

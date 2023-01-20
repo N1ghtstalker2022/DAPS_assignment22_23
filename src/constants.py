@@ -11,4 +11,3 @@ MONGODB_SERVER_ADDRESS = (
 DATABASE_NAME = "daps_data"
 
 Collections = Enum('Collections', ('stocks', 'weather', 'covid'))
-

@@ -14,7 +14,6 @@ from .constants import MONGODB_SERVER_ADDRESS
 from .utils import create_dir
 
 
-# get mongo credentials from local file
 def get_mongo_credentials(filepath):
     """Get personal credentials to connect with mongodb.
 
@@ -124,4 +123,3 @@ def read_from_db(db_name, col_name):
     cur_col = db[col_name]
     all_data = cur_col.find()
     return all_data
-
